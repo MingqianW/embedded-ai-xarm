@@ -10,3 +10,4 @@ This repository contains the first stage of an embedded AI project for robot man
 - `requirements.txt` — list of Python dependencies.
 
 More detailed documentation will be added as the project progresses.
+See `docs/step1_data_collection.md` for guidelines on Step 1 data collection, including task families, hours allocation and dataset quality.
