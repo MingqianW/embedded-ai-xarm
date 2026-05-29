@@ -1,0 +1,31 @@
+task_name: pick_red_cube_to_green_zone
+language_instruction: "Pick the red cube and place it in the green zone."
+objects:
+  - name: red_cube
+    geometry: cube
+    color: red
+  - name: green_zone
+    geometry: zone
+    color: green
+initial_distribution:
+  red_cube_xy:
+    x: [0.2, 0.4]
+    y: [0.1, 0.3]
+  green_zone_xy:
+    x: [0.5, 0.6]
+    y: [0.1, 0.3]
+success_condition:
+  description: red_cube center inside green_zone for 2 seconds
+failure_conditions:
+  - collision
+  - object_out_of_workspace
+  - timeout
+observations:
+  - wrist_camera_rgb
+  - fixed_camera_rgb
+  - robot_joint_state
+  - end_effector_pose
+actions:
+  type: delta_end_effector
+  dimension: 7  # dx, dy, dz, droll, dpitch, dyaw, gripper
+control_frequency_hz: 10
