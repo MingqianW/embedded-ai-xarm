@@ -1,5 +1,5 @@
 numpy
 h5py
 opencv-python
-ufactory-xarm
+xarm-python-sdk
 pyrealsense2
