@@ -3,3 +3,4 @@ h5py
 opencv-python
 xarm-python-sdk
 pyrealsense2
+PyYAML
