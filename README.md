@@ -1,6 +1,6 @@
-# Embedded AI xArm – Step 1
+# Embodied AI xArm – Step 1
 
-This repository contains the first stage of an embedded AI project. In this step we define manipulation tasks, generate trajectories on a real xArm 6 robot, and record the data in a clean format suitable for demonstration learning.
+This repository contains the first stage of an embodied AI project. In this step we define manipulation tasks, generate trajectories on a real xArm 6 robot, and record the data in a clean format suitable for demonstration learning.
 
 ## Contents
 

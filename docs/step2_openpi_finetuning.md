@@ -58,8 +58,8 @@ GIT_LFS_SKIP_SMUDGE=1 uv pip install -e .
 From the OpenPI environment, run this project's converter:
 
 ```bash
-uv run python /path/to/embedded-ai-xarm/scripts/prepare_openpi_lerobot.py \
-  --input /path/to/embedded-ai-xarm/data/raw/pick_place.hdf5 \
+uv run python /path/to/embodied-ai-xarm/scripts/prepare_openpi_lerobot.py \
+  --input /path/to/embodied-ai-xarm/data/raw/pick_place.hdf5 \
   --repo-id your_hf_username/xarm_pick_place \
   --robot-type xarm6 \
   --fps 10 \
@@ -73,7 +73,7 @@ The LeRobot dataset is saved under `$HF_LEROBOT_HOME/your_hf_username/xarm_pick_
 Print the config snippet:
 
 ```bash
-python /path/to/embedded-ai-xarm/fine_tune/openpi_xarm_config.py
+python /path/to/embodied-ai-xarm/fine_tune/openpi_xarm_config.py
 ```
 
 Copy the printed `LeRobotXArmDataConfig` class and `TrainConfig(name="pi05_xarm", ...)` entry into OpenPI's `src/openpi/training/config.py`. Set the `repo_id` to the same id used during conversion.
@@ -115,7 +115,7 @@ You can also use the helper script:
 ```powershell
 .\fine_tune\train_openpi_pi05_xarm.ps1 `
   -OpenPiDir C:\path\to\openpi `
-  -RawHdf5 C:\path\to\embedded-ai-xarm\data\raw\pick_place.hdf5 `
+  -RawHdf5 C:\path\to\embodied-ai-xarm\data\raw\pick_place.hdf5 `
   -RepoId your_hf_username/xarm_pick_place
 ```
 

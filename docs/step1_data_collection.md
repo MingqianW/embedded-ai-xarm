@@ -1,6 +1,6 @@
 # Step 1 Data Collection Guidelines
 
-This document outlines the task families and guidelines for collecting 100 hours of teleoperated demonstrations on an xArm 6 robot as part of Step 1 of the embedded AI project. The goal is to create a diverse, high‑quality dataset for imitation learning.
+This document outlines the task families and guidelines for collecting 100 hours of teleoperated demonstrations on an xArm 6 robot as part of Step 1 of the embodied AI project. The goal is to create a diverse, high‑quality dataset for imitation learning.
 
 ## Task Families and Hours Allocation
 

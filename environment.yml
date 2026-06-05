@@ -1,0 +1,14 @@
+name: embodied-ai
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - h5py
+  - pyyaml
+  - pip:
+      - opencv-python
+      - xarm-python-sdk
+      - pyrealsense2
