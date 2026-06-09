@@ -38,6 +38,7 @@ For clean success pick-up demonstrations, use the following canonical motion sty
 6. Lift the block vertically.
 7. Hold the lifted block for at least 0.5 seconds.
 
+Note: At least first 50 demonstrations should strictly follwo that.
 ## Episode Plan
 
 | Stage | Episodes | Purpose |
