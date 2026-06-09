@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from statistics import median
 
+from xarm_data_config import get_raw_data_root
+
 
 @dataclass
 class EpisodeDuration:
@@ -165,7 +167,7 @@ def print_report(reports: list[EpisodeDuration], *, show_episodes: bool, max_mes
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--raw-root", type=Path, default=Path("fine_tune/data/xarm_pi05_data/raw"))
+    parser.add_argument("--raw-root", type=Path, default=None, help="Override raw data root from xarm_data_config.json.")
     parser.add_argument(
         "--include-last-frame",
         action="store_true",
@@ -175,7 +177,7 @@ def main() -> None:
     parser.add_argument("--max-messages", type=int, default=80)
     args = parser.parse_args()
 
-    raw_root = args.raw_root
+    raw_root = get_raw_data_root(args.raw_root)
     if not raw_root.exists():
         raise SystemExit(f"raw root does not exist: {raw_root}")
 

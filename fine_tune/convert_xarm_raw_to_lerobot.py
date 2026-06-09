@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from xarm_data_config import get_raw_data_root
+
 
 STATE_COLUMNS = (
     "j1_rad",
@@ -353,8 +355,8 @@ def main() -> None:
     parser.add_argument(
         "--raw-root",
         type=Path,
-        default=Path("fine_tune/data/xarm_pi05_data/raw"),
-        help="Raw task/episode directory root.",
+        default=None,
+        help="Override raw data root from xarm_data_config.json.",
     )
     parser.add_argument(
         "--output-dir",
@@ -374,7 +376,7 @@ def main() -> None:
     args = parser.parse_args()
 
     convert(
-        args.raw_root,
+        get_raw_data_root(args.raw_root),
         args.output_dir,
         repo_id=args.repo_id,
         robot_type=args.robot_type,

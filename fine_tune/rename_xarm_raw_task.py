@@ -24,6 +24,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from xarm_data_config import get_raw_data_root
+
 
 def read_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
@@ -190,7 +192,7 @@ def rename_task(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--raw-root", type=Path, default=Path("fine_tune/data/xarm_pi05_data/raw"))
+    parser.add_argument("--raw-root", type=Path, default=None, help="Override raw data root from xarm_data_config.json.")
     parser.add_argument("--old-task", required=True, help="Existing task folder/name to rename.")
     parser.add_argument("--new-task", required=True, help="New task folder/name.")
     parser.add_argument(
@@ -210,7 +212,7 @@ def main() -> None:
         raise SystemExit("--merge and --copy cannot be used together")
 
     rename_task(
-        args.raw_root,
+        get_raw_data_root(args.raw_root),
         old_task=args.old_task,
         new_task=args.new_task,
         merge=args.merge,

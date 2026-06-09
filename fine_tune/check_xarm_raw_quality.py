@@ -27,6 +27,8 @@ from pathlib import Path
 from statistics import mean, median
 from typing import Any
 
+from xarm_data_config import get_raw_data_root
+
 
 STATE_COLUMNS = (
     "j1_rad",
@@ -333,7 +335,7 @@ def print_report(reports: list[EpisodeReport], *, show_ok: bool, max_messages: i
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--raw-root", type=Path, default=Path("fine_tune/data/xarm_pi05_data/raw"))
+    parser.add_argument("--raw-root", type=Path, default=None, help="Override raw data root from xarm_data_config.json.")
     parser.add_argument("--expected-fps", type=float, default=10.0)
     parser.add_argument("--fps-tolerance", type=float, default=0.03, help="Allowed mean dt error in seconds.")
     parser.add_argument("--expected-width", type=int, default=640)
@@ -349,7 +351,7 @@ def main() -> None:
     parser.add_argument("--strict", action="store_true", help="Exit nonzero on warnings as well as errors.")
     args = parser.parse_args()
 
-    raw_root = args.raw_root
+    raw_root = get_raw_data_root(args.raw_root)
     if not raw_root.exists():
         raise SystemExit(f"raw root does not exist: {raw_root}")
 
