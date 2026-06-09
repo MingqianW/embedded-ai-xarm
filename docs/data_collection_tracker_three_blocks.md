@@ -4,9 +4,9 @@ Use only these three task folders/prompts:
 
 | Task Folder | Prompt | Target Episodes | Done |
 |---|---|---:|---:|
-| `pick_up_dark_blue_block` | `pick up dark blue block` | 168 | 0 |
-| `pick_up_light_blue_block` | `pick up light blue block` | 168 | 0 |
-| `pick_up_red_block` | `pick up red block` | 168 | 0 |
+| `pick_up_dark_blue_block` | `pick up dark blue block` | 168 | 50 |
+| `pick_up_light_blue_block` | `pick up light blue block` | 168 | 50 |
+| `pick_up_red_block` | `pick up red block` | 168 | 50 |
 | **Total** |  | **504** | **0** |
 
 Scene type, distractors, hard cases, and recovery are metadata/notes only. Do not put them in the prompt.
@@ -28,7 +28,7 @@ Use the same ranges inside each task folder.
 
 | Milestone | Collect Through | Total Episodes | Done |
 |---|---|---:|---|
-| Minimum | `episode_049` for each block | 150 | [ ] |
+| Minimum | `episode_049` for each block | 150 | [x] |
 | Pilot | `episode_089` for each block | 270 | [ ] |
 | Full | `episode_167` for each block | 504 | [ ] |
 
@@ -36,9 +36,9 @@ Use the same ranges inside each task folder.
 
 | Block | Stage 0 | Stage 1 | Stage 2 | Stage 3 | Stage 4 | Stage 5 | Total Done |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Dark blue | 0/10 | 0/40 | 0/40 | 0/45 | 0/20 | 0/13 | 0/168 |
-| Light blue | 0/10 | 0/40 | 0/40 | 0/45 | 0/20 | 0/13 | 0/168 |
-| Red | 0/10 | 0/40 | 0/40 | 0/45 | 0/20 | 0/13 | 0/168 |
+| Dark blue | 10/10 | 40/40 | 0/40 | 0/45 | 0/20 | 0/13 | 0/168 |
+| Light blue | 10/10 | 40/40 | 0/40 | 0/45 | 0/20 | 0/13 | 0/168 |
+| Red | 10/10 | 40/40 | 0/40 | 0/45 | 0/20 | 0/13 | 0/168 |
 
 ## Active Session Notes
 
