@@ -144,6 +144,9 @@ def check_episode(
     gripper_min_warn: float,
     gripper_max_warn: float,
     check_optional_camera: bool,
+    stationary_duration: float,
+    stationary_joint_threshold: float,
+    stationary_gripper_threshold: float,
 ) -> EpisodeReport:
     task = episode_dir.parent.name
     report = EpisodeReport(task=task, episode_name=episode_dir.name, path=episode_dir)
@@ -282,6 +285,49 @@ def check_episode(
         if report.max_gripper_delta > max_gripper_delta_warn:
             report.warnings.append(f"large gripper delta max={report.max_gripper_delta:.1f} mm")
 
+    # Detect long stationary segments: consecutive frames where movement is below thresholds.
+    if stationary_duration > 0 and len(states) >= 2:
+        # compute per-pair max joint delta and gripper delta
+        pair_joint_max: list[float] = []
+        pair_gripper_delta: list[float] = []
+        for a, b in zip(states, states[1:]):
+            pair_joint_max.append(max(abs(b[i] - a[i]) for i in range(6)))
+            pair_gripper_delta.append(abs(b[6] - a[6]))
+
+        # accumulate consecutive stationary pairs' durations
+        cur_duration = 0.0
+        cur_start = None
+        stationary_segments: list[tuple[int, int, float]] = []  # (start_idx, end_idx, duration)
+        for i, dt in enumerate(dts):
+            is_stationary = (
+                pair_joint_max[i] <= stationary_joint_threshold and pair_gripper_delta[i] <= stationary_gripper_threshold
+            )
+            if is_stationary:
+                if cur_start is None:
+                    cur_start = i
+                    cur_duration = dt
+                else:
+                    cur_duration += dt
+            else:
+                if cur_start is not None:
+                    if cur_duration >= stationary_duration:
+                        stationary_segments.append((cur_start, i, cur_duration))
+                    cur_start = None
+                    cur_duration = 0.0
+        # tail
+        if cur_start is not None and cur_duration >= stationary_duration:
+            stationary_segments.append((cur_start, len(dts), cur_duration))
+
+        if stationary_segments:
+            for start_i, end_i, dur in stationary_segments[:5]:
+                # report rows as inclusive range of row indices (0-based)->present as counts
+                report.warnings.append(
+                    f"stationary segment rows {start_i}..{end_i} duration={dur:.3f}s "
+                    f"(joint<{stationary_joint_threshold}, gripper<{stationary_gripper_threshold})"
+                )
+            if len(stationary_segments) > 5:
+                report.warnings.append(f"{len(stationary_segments)} stationary segments total")
+
     return report
 
 
@@ -346,6 +392,30 @@ def main() -> None:
     parser.add_argument("--gripper-min-warn", type=float, default=100.0)
     parser.add_argument("--gripper-max-warn", type=float, default=900.0)
     parser.add_argument("--check-optional-camera", action="store_true", help="Also check realsense_2_file if present.")
+    parser.add_argument(
+        "--short-length-fraction",
+        type=float,
+        default=0.75,
+        help="Flag episodes shorter than (median rows * FRACTION). Set <=0 to disable.",
+    )
+    parser.add_argument(
+        "--stationary-duration",
+        type=float,
+        default=2.0,
+        help="Duration (s) to consider a segment stationary (<=0 to disable).",
+    )
+    parser.add_argument(
+        "--stationary-joint-threshold",
+        type=float,
+        default=1e-3,
+        help="Max joint delta (rad) per frame to count as stationary.",
+    )
+    parser.add_argument(
+        "--stationary-gripper-threshold",
+        type=float,
+        default=1.0,
+        help="Max gripper delta (mm) per frame to count as stationary.",
+    )
     parser.add_argument("--show-ok", action="store_true")
     parser.add_argument("--max-messages", type=int, default=80)
     parser.add_argument("--strict", action="store_true", help="Exit nonzero on warnings as well as errors.")
@@ -372,9 +442,25 @@ def main() -> None:
             gripper_min_warn=args.gripper_min_warn,
             gripper_max_warn=args.gripper_max_warn,
             check_optional_camera=args.check_optional_camera,
+            stationary_duration=args.stationary_duration,
+            stationary_joint_threshold=args.stationary_joint_threshold,
+            stationary_gripper_threshold=args.stationary_gripper_threshold,
         )
         for episode_dir in episode_dirs
     ]
+
+    # Detect unusually short episodes per task: compare rows to task median.
+    if args.short_length_fraction > 0:
+        task_rows: dict[str, list[int]] = defaultdict(list)
+        for r in reports:
+            task_rows[r.task].append(r.rows)
+        task_medians: dict[str, float] = {t: median(v) if v else 0.0 for t, v in task_rows.items()}
+        for r in reports:
+            med = task_medians.get(r.task, 0.0)
+            if med > 0 and r.rows < med * args.short_length_fraction:
+                r.warnings.append(
+                    f"short episode length rows={r.rows} << task median {int(med)} (fraction={args.short_length_fraction})"
+                )
 
     print_report(reports, show_ok=args.show_ok, max_messages=args.max_messages)
 
