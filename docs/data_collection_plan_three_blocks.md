@@ -26,7 +26,17 @@ Average episode length: 12-16 seconds
 Approximate effective duration: 125 minutes
 ```
 
+## Pick-Up Motion Style Rule
 
+For clean success pick-up demonstrations, use the following canonical motion style:
+
+1. Start with the gripper open and above the workspace.
+2. Move laterally at a safe height until the gripper is above the target block.
+3. Align the gripper with the block while staying above the block.
+4. Descend mostly vertically.
+5. Close the gripper.
+6. Lift the block vertically.
+7. Hold the lifted block for at least 0.5 seconds.
 
 ## Episode Plan
 
