@@ -29,16 +29,16 @@ Use the same ranges inside each task folder.
 | Milestone | Collect Through | Total Episodes | Done |
 |---|---|---:|---|
 | Minimum | `episode_049` for each block | 150 | [x] |
-| Pilot | `episode_089` for each block | 270 | [ ] |
+| Pilot | `episode_089` for each block | 270 | [x] |
 | Full | `episode_167` for each block | 504 | [ ] |
 
 ## Progress By Block
 
 | Block | Stage 0 | Stage 1 | Stage 2 | Stage 3 | Stage 4 | Stage 5 | Total Done |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Dark blue | 10/10 | 40/40 | 0/40 | 0/45 | 0/20 | 0/13 | 0/168 |
-| Light blue | 10/10 | 40/40 | 0/40 | 0/45 | 0/20 | 0/13 | 0/168 |
-| Red | 10/10 | 40/40 | 0/40 | 0/45 | 0/20 | 0/13 | 0/168 |
+| Dark blue | 10/10 | 40/40 | 40/40 | 0/45 | 0/20 | 0/13 | 0/168 |
+| Light blue | 10/10 | 40/40 | 40/40 | 0/45 | 0/20 | 0/13 | 0/168 |
+| Red | 10/10 | 40/40 | 40/40 | 0/45 | 0/20 | 0/13 | 0/168 |
 
 ## Active Session Notes
 
