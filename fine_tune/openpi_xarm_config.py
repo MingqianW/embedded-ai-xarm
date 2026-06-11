@@ -70,9 +70,36 @@ class LeRobotXArmDataConfig(DataConfigFactory):
         )
 
 
-# Add these TrainConfig entries to _CONFIGS. They use LoRA so they are suitable
-# for Colab-class GPUs. Start with pi05_xarm_colab_smoke to verify data loading
-# and checkpointing, then switch to pi05_xarm.
+# Add these TrainConfig entries to _CONFIGS. Start with
+# pi05_xarm_colab_smoke to verify data loading and checkpointing. Use
+# pi05_xarm for low-memory LoRA fine-tuning, or pi05_xarm_full_finetune only
+# when you have enough GPU memory for full pi0.5 fine-tuning.
+TrainConfig(
+    name="pi05_xarm_full_finetune",
+    model=pi0_config.Pi0Config(
+        pi05=True,
+        action_dim=32,
+        action_horizon=10,
+        discrete_state_input=False,
+    ),
+    data=LeRobotXArmDataConfig(
+        repo_id="local/xarm_pi05_data",
+        base_config=DataConfig(prompt_from_task=True),
+    ),
+    lr_schedule=_optimizer.CosineDecaySchedule(
+        warmup_steps=1_000,
+        peak_lr=5e-5,
+        decay_steps=1_000_000,
+        decay_lr=5e-5,
+    ),
+    optimizer=_optimizer.AdamW(clip_gradient_norm=1.0),
+    ema_decay=0.999,
+    weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_base/params"),
+    batch_size=8,
+    num_train_steps=20_000,
+    save_interval=1_000,
+),
+
 TrainConfig(
     name="pi05_xarm",
     model=pi0_config.Pi0Config(
