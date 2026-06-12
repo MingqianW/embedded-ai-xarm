@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +49,7 @@ TCP_COLUMNS = (
 
 @dataclass(frozen=True)
 class Episode:
+    raw_id: str
     task: str
     raw_dir: Path
     meta: dict[str, Any]
@@ -88,7 +90,8 @@ def _find_episodes(raw_root: Path) -> list[Episode]:
             print(f"skip {episode_dir}: missing columns {missing_columns}")
             continue
 
-        episodes.append(Episode(task=task, raw_dir=episode_dir, meta=meta, rows=rows))
+        raw_id = meta_path.relative_to(raw_root).parent.as_posix()
+        episodes.append(Episode(raw_id=raw_id, task=task, raw_dir=episode_dir, meta=meta, rows=rows))
     return episodes
 
 
@@ -109,9 +112,10 @@ def _copy_image(src: Path, dst: Path, *, overwrite: bool) -> str:
     return dst.resolve().as_posix()
 
 
-def _write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
+def _write_jsonl(path: Path, records: list[dict[str, Any]], *, append: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
+    mode = "a" if append else "w"
+    with path.open(mode, encoding="utf-8") as f:
         for record in records:
             f.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
 
@@ -188,6 +192,31 @@ def _try_write_hf_dataset(output_dir: Path, records: list[dict[str, Any]]) -> bo
     return True
 
 
+def _default_manifest_path(repo_id: str, output_dir: Path) -> Path:
+    hf_home = os.environ.get("HF_LEROBOT_HOME")
+    if hf_home:
+        return Path(hf_home) / repo_id / "meta" / "xarm_raw_manifest.json"
+    return output_dir / "meta" / "xarm_raw_manifest.json"
+
+
+def _read_manifest(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"converted_raw_episodes": []}
+    data = _read_json(path)
+    if not isinstance(data.get("converted_raw_episodes"), list):
+        raise ValueError(f"invalid converted_raw_episodes in manifest: {path}")
+    return data
+
+
+def _write_manifest(path: Path, *, converted_raw_ids: set[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = {
+        "format": "xarm_raw_conversion_manifest_v1",
+        "converted_raw_episodes": sorted(converted_raw_ids),
+    }
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 def _try_write_lerobot_dataset(
     records_by_episode: list[list[dict[str, Any]]],
     *,
@@ -195,7 +224,11 @@ def _try_write_lerobot_dataset(
     robot_type: str,
     fps: int,
     push_to_hub: bool,
+    hub_private: bool,
     overwrite: bool,
+    append_new: bool,
+    image_writer_threads: int,
+    image_writer_processes: int,
 ) -> bool:
     try:
         from lerobot.common.datasets.lerobot_dataset import HF_LEROBOT_HOME
@@ -209,35 +242,41 @@ def _try_write_lerobot_dataset(
     if output_path.exists() and overwrite:
         shutil.rmtree(output_path)
 
-    dataset = LeRobotDataset.create(
-        repo_id=repo_id,
-        robot_type=robot_type,
-        fps=fps,
-        features={
-            "image": {
-                "dtype": "image",
-                "shape": (480, 640, 3),
-                "names": ["height", "width", "channel"],
-            },
-            "wrist_image": {
-                "dtype": "image",
-                "shape": (480, 640, 3),
-                "names": ["height", "width", "channel"],
-            },
-            "state": {
-                "dtype": "float32",
-                "shape": (len(STATE_COLUMNS),),
-                "names": ["state"],
-            },
-            "actions": {
-                "dtype": "float32",
-                "shape": (len(STATE_COLUMNS),),
-                "names": ["actions"],
-            },
+    if output_path.exists() and append_new and not overwrite:
+        try:
+            dataset = LeRobotDataset(repo_id=repo_id)
+        except TypeError:
+            dataset = LeRobotDataset(repo_id)
+    else:
+        dataset = LeRobotDataset.create(
+            repo_id=repo_id,
+            robot_type=robot_type,
+            fps=fps,
+            features={
+                "image": {
+                    "dtype": "image",
+                    "shape": (480, 640, 3),
+                    "names": ["height", "width", "channel"],
+                },
+                "wrist_image": {
+                    "dtype": "image",
+                    "shape": (480, 640, 3),
+                    "names": ["height", "width", "channel"],
+                },
+                "state": {
+                    "dtype": "float32",
+                    "shape": (len(STATE_COLUMNS),),
+                    "names": ["state"],
+                },
+                "actions": {
+                    "dtype": "float32",
+                    "shape": (len(STATE_COLUMNS),),
+                    "names": ["actions"],
+                },
         },
-        image_writer_threads=10,
-        image_writer_processes=5,
-    )
+        image_writer_threads=image_writer_threads,
+        image_writer_processes=image_writer_processes,
+        )
 
     for episode_records in records_by_episode:
         for record in episode_records:
@@ -255,7 +294,7 @@ def _try_write_lerobot_dataset(
     if push_to_hub:
         dataset.push_to_hub(
             tags=["xarm", "xarm6", "openpi"],
-            private=False,
+            private=hub_private,
             push_videos=True,
             license="apache-2.0",
         )
@@ -272,30 +311,60 @@ def convert(
     robot_type: str,
     fps: int,
     push_to_hub: bool,
+    hub_private: bool,
     overwrite: bool,
+    append_new: bool,
+    manifest_path: Path | None,
+    skip_light_image_copy: bool,
+    skip_hf_dataset: bool,
+    image_writer_threads: int,
+    image_writer_processes: int,
 ) -> None:
     episodes = _find_episodes(raw_root)
     if not episodes:
         raise SystemExit(f"No episodes found under {raw_root}")
 
+    manifest_path = manifest_path or _default_manifest_path(repo_id, output_dir)
+    converted_raw_ids: set[str] = set()
+    if append_new and not overwrite:
+        dataset_dir = manifest_path.parent.parent
+        if dataset_dir.exists() and not manifest_path.exists():
+            raise SystemExit(
+                f"append-new cannot safely continue because an existing dataset has no conversion manifest: {dataset_dir}\n"
+                "Run once with --overwrite to rebuild the dataset and create the manifest, then use --append-new "
+                "for future incremental updates."
+            )
+        converted_raw_ids = set(str(raw_id) for raw_id in _read_manifest(manifest_path)["converted_raw_episodes"])
+        before = len(episodes)
+        episodes = [episode for episode in episodes if episode.raw_id not in converted_raw_ids]
+        skipped = before - len(episodes)
+        print(f"append-new manifest: {manifest_path}")
+        print(f"skip already converted raw episode(s): {skipped}")
+        if not episodes:
+            print("no new raw episodes to convert")
+            return
+
     if output_dir.exists() and overwrite:
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    existing_episode_count = len(converted_raw_ids) if append_new and not overwrite else 0
     records: list[dict[str, Any]] = []
     records_by_episode: list[list[dict[str, Any]]] = []
     missing_images: list[str] = []
 
     for episode_index, episode in enumerate(episodes):
-        image_dir = output_dir / "images" / f"episode_{episode_index:06d}"
+        global_episode_index = existing_episode_count + episode_index
+        image_dir = output_dir / "images" / f"episode_{global_episode_index:06d}"
         episode_records: list[dict[str, Any]] = []
         for frame_index, row in enumerate(episode.rows[:-1]):
             next_row = episode.rows[frame_index + 1]
             instruction = _instruction_from_task(episode.task)
             base = {
-                "episode_index": episode_index,
+                "episode_index": global_episode_index,
                 "frame_index": frame_index,
                 "timestamp": float(row["ts"]),
+                "raw_id": episode.raw_id,
                 "raw_task": episode.task,
                 "task": instruction,
                 "prompt": instruction,
@@ -304,16 +373,26 @@ def convert(
             }
 
             try:
-                image = _copy_image(
-                    episode.raw_dir / row["realsense_0_file"],
-                    image_dir / "image" / f"{frame_index:06d}.png",
-                    overwrite=overwrite,
-                )
-                wrist_image = _copy_image(
-                    episode.raw_dir / row["realsense_1_file"],
-                    image_dir / "wrist_image" / f"{frame_index:06d}.png",
-                    overwrite=overwrite,
-                )
+                raw_image = episode.raw_dir / row["realsense_0_file"]
+                raw_wrist_image = episode.raw_dir / row["realsense_1_file"]
+                if skip_light_image_copy:
+                    if not raw_image.exists():
+                        raise FileNotFoundError(raw_image)
+                    if not raw_wrist_image.exists():
+                        raise FileNotFoundError(raw_wrist_image)
+                    image = raw_image.resolve().as_posix()
+                    wrist_image = raw_wrist_image.resolve().as_posix()
+                else:
+                    image = _copy_image(
+                        raw_image,
+                        image_dir / "image" / f"{frame_index:06d}.png",
+                        overwrite=overwrite,
+                    )
+                    wrist_image = _copy_image(
+                        raw_wrist_image,
+                        image_dir / "wrist_image" / f"{frame_index:06d}.png",
+                        overwrite=overwrite,
+                    )
             except FileNotFoundError as exc:
                 missing_images.append(str(exc))
                 continue
@@ -328,17 +407,26 @@ def convert(
         preview = "\n".join(missing_images[:10])
         raise SystemExit(f"Missing {len(missing_images)} image files. First missing files:\n{preview}")
 
-    _write_jsonl(output_dir / "data" / "train.jsonl", records)
+    _write_jsonl(output_dir / "data" / "train.jsonl", records, append=append_new and not overwrite)
     _write_metadata(output_dir, episodes, records)
-    hf_written = _try_write_hf_dataset(output_dir, records)
+    hf_written = False if skip_hf_dataset else _try_write_hf_dataset(output_dir, records)
     lerobot_written = _try_write_lerobot_dataset(
         records_by_episode,
         repo_id=repo_id,
         robot_type=robot_type,
         fps=fps,
         push_to_hub=push_to_hub,
+        hub_private=hub_private,
         overwrite=overwrite,
+        append_new=append_new,
+        image_writer_threads=image_writer_threads,
+        image_writer_processes=image_writer_processes,
     )
+
+    if lerobot_written or not records_by_episode:
+        converted_raw_ids.update(episode.raw_id for episode in episodes)
+        _write_manifest(manifest_path, converted_raw_ids=converted_raw_ids)
+        print(f"conversion manifest: {manifest_path}")
 
     print(f"converted episodes: {len(episodes)}")
     print(f"converted frames: {len(records)}")
@@ -346,6 +434,8 @@ def convert(
     print(f"metadata: {output_dir / 'meta' / 'info.json'}")
     if hf_written:
         print(f"huggingface dataset: {output_dir / 'hf_dataset'}")
+    elif skip_hf_dataset:
+        print("skipped Hugging Face dataset export")
     if not lerobot_written:
         print("install lerobot in the OpenPI environment to create the real LeRobotDataset")
 
@@ -366,14 +456,51 @@ def main() -> None:
     )
     parser.add_argument(
         "--repo-id",
-        default="your_hf_username/xarm_pi05_data",
+        default="local/xarm_pi05_data",
         help="LeRobot repo id, also used as the local dataset name under HF_LEROBOT_HOME.",
     )
     parser.add_argument("--robot-type", default="xarm6")
     parser.add_argument("--fps", type=int, default=10)
     parser.add_argument("--push-to-hub", action="store_true")
+    parser.add_argument("--hub-private", action="store_true", help="Create/update a private Hugging Face dataset repo.")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--append-new",
+        action="store_true",
+        help="Append only raw episodes not listed in the persistent conversion manifest.",
+    )
+    parser.add_argument(
+        "--manifest-path",
+        type=Path,
+        default=None,
+        help="Override the append-new manifest path. Defaults under HF_LEROBOT_HOME/repo-id/meta.",
+    )
+    parser.add_argument(
+        "--skip-light-image-copy",
+        action="store_true",
+        help="Do not copy raw images into output-dir/images; JSONL records point to raw images directly.",
+    )
+    parser.add_argument(
+        "--skip-hf-dataset",
+        action="store_true",
+        help="Skip the extra datasets.Dataset save_to_disk export; LeRobotDataset export still runs.",
+    )
+    parser.add_argument(
+        "--image-writer-threads",
+        type=int,
+        default=10,
+        help="LeRobot image writer thread count.",
+    )
+    parser.add_argument(
+        "--image-writer-processes",
+        type=int,
+        default=5,
+        help="LeRobot image writer process count.",
+    )
     args = parser.parse_args()
+
+    if args.overwrite and args.append_new:
+        raise SystemExit("--overwrite and --append-new cannot be used together")
 
     convert(
         get_raw_data_root(args.raw_root),
@@ -382,7 +509,14 @@ def main() -> None:
         robot_type=args.robot_type,
         fps=args.fps,
         push_to_hub=args.push_to_hub,
+        hub_private=args.hub_private,
         overwrite=args.overwrite,
+        append_new=args.append_new,
+        manifest_path=args.manifest_path,
+        skip_light_image_copy=args.skip_light_image_copy,
+        skip_hf_dataset=args.skip_hf_dataset,
+        image_writer_threads=args.image_writer_threads,
+        image_writer_processes=args.image_writer_processes,
     )
 
 

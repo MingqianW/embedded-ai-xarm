@@ -395,7 +395,7 @@ def main() -> None:
     parser.add_argument(
         "--short-length-fraction",
         type=float,
-        default=0.75,
+        default=0.5,
         help="Flag episodes shorter than (median rows * FRACTION). Set <=0 to disable.",
     )
     parser.add_argument(

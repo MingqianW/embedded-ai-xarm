@@ -8,6 +8,8 @@ with the repo id used by fine_tune/convert_xarm_raw_to_lerobot.py.
 
 # Add these imports in openpi/src/openpi/training/config.py if they are not present:
 # import dataclasses
+# import pathlib
+# from typing_extensions import override
 # import openpi.transforms as _transforms
 # import openpi.models.model as _model
 # import openpi.policies.libero_policy as libero_policy
@@ -70,18 +72,19 @@ class LeRobotXArmDataConfig(DataConfigFactory):
         )
 
 
-# Add these TrainConfig entries to _CONFIGS. They use LoRA so they are suitable
-# for Colab-class GPUs. Start with pi05_xarm_colab_smoke to verify data loading
-# and checkpointing, then switch to pi05_xarm.
+# Add these TrainConfig entries to _CONFIGS. Start with
+# pi05_xarm_colab_smoke to verify data loading and checkpointing, then use
+# pi05_xarm_full_finetune for full pi0.5 fine-tuning.
+#
+# Full fine-tuning intentionally does NOT set LoRA variants and does NOT set a
+# freeze_filter. This follows OpenPI's pi05_libero full fine-tuning pattern.
 TrainConfig(
-    name="pi05_xarm",
+    name="pi05_xarm_full_finetune",
     model=pi0_config.Pi0Config(
         pi05=True,
         action_dim=32,
         action_horizon=10,
         discrete_state_input=False,
-        paligemma_variant="gemma_2b_lora",
-        action_expert_variant="gemma_300m_lora",
     ),
     data=LeRobotXArmDataConfig(
         repo_id="local/xarm_pi05_data",
@@ -94,19 +97,37 @@ TrainConfig(
         decay_lr=5e-5,
     ),
     optimizer=_optimizer.AdamW(clip_gradient_norm=1.0),
-    freeze_filter=pi0_config.Pi0Config(
+    ema_decay=0.999,
+    weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_base/params"),
+    batch_size=8,
+    num_train_steps=20_000,
+    save_interval=7_000,
+),
+
+TrainConfig(
+    name="pi05_xarm",
+    model=pi0_config.Pi0Config(
         pi05=True,
         action_dim=32,
         action_horizon=10,
         discrete_state_input=False,
-        paligemma_variant="gemma_2b_lora",
-        action_expert_variant="gemma_300m_lora",
-    ).get_freeze_filter(),
-    ema_decay=None,
+    ),
+    data=LeRobotXArmDataConfig(
+        repo_id="local/xarm_pi05_data",
+        base_config=DataConfig(prompt_from_task=True),
+    ),
+    lr_schedule=_optimizer.CosineDecaySchedule(
+        warmup_steps=1_000,
+        peak_lr=5e-5,
+        decay_steps=1_000_000,
+        decay_lr=5e-5,
+    ),
+    optimizer=_optimizer.AdamW(clip_gradient_norm=1.0),
+    ema_decay=0.999,
     weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_base/params"),
-    batch_size=16,
-    num_train_steps=30_000,
-    save_interval=1_000,
+    batch_size=8,
+    num_train_steps=20_000,
+    save_interval=10_000,
 ),
 
 TrainConfig(
